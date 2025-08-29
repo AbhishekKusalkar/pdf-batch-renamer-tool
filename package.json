@@ -1,0 +1,14 @@
+{
+  "name": "pdf-batch-renamer-tool",
+  "version": "1.0.0",
+  "description": "A web-based tool for viewing and renaming multiple PDF files in batch",
+  "main": "index.html",
+  "scripts": {
+    "dev": "serve .",
+    "build": "echo 'No build step required'",
+    "start": "serve ."
+  },
+  "keywords": ["pdf", "batch", "rename", "viewer", "tool"],
+  "author": "Your Name",
+  "license": "MIT"
+}
