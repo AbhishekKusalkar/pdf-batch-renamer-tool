@@ -177,10 +177,12 @@
             gap: 10px;
             align-items: center;
             margin-top: 15px;
+            flex-wrap: wrap;
         }
 
         .rename-input {
             flex: 1;
+            min-width: 200px;
             padding: 12px 15px;
             border: 2px solid #e0e0e0;
             border-radius: 10px;
@@ -201,6 +203,29 @@
 
         .rename-btn:hover {
             box-shadow: 0 8px 25px rgba(40, 167, 69, 0.4);
+        }
+
+        .download-section {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+
+        .download-btn {
+            background: linear-gradient(135deg, #fd7e14, #e67e22);
+        }
+
+        .download-btn:hover {
+            box-shadow: 0 8px 25px rgba(253, 126, 20, 0.4);
+        }
+
+        .download-all-btn {
+            background: linear-gradient(135deg, #6f42c1, #8e44ad);
+        }
+
+        .download-all-btn:hover {
+            box-shadow: 0 8px 25px rgba(111, 66, 193, 0.4);
         }
 
         .pdf-viewer {
@@ -247,6 +272,15 @@
             animation: slideIn 0.3s ease;
         }
 
+        .info-message {
+            background: linear-gradient(135deg, #17a2b8, #20c997);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 10px;
+            margin-top: 15px;
+            font-size: 0.9em;
+        }
+
         @keyframes slideIn {
             from {
                 opacity: 0;
@@ -271,6 +305,16 @@
             text-align: center;
         }
 
+        .renamed-indicator {
+            display: inline-block;
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 5px;
+            font-size: 0.8em;
+            margin-left: 10px;
+        }
+
         @media (max-width: 768px) {
             .controls {
                 flex-direction: column;
@@ -283,7 +327,8 @@
                 justify-content: center;
             }
 
-            .rename-section {
+            .rename-section,
+            .download-section {
                 flex-direction: column;
             }
 
@@ -297,7 +342,7 @@
     <div class="container">
         <div class="header">
             <h1>📄 PDF Batch Viewer & Renamer</h1>
-            <p>Upload multiple PDFs, view them easily, and rename files based on their content</p>
+            <p>Upload multiple PDFs, view them easily, rename files and download with new names</p>
         </div>
 
         <div class="upload-section">
@@ -346,6 +391,19 @@
                     </button>
                 </div>
                 
+                <div class="download-section">
+                    <button id="downloadCurrentBtn" class="btn download-btn">
+                        📥 Download Current File
+                    </button>
+                    <button id="downloadAllBtn" class="btn download-all-btn">
+                        📦 Download All Files as ZIP
+                    </button>
+                </div>
+
+                <div class="info-message">
+                    💡 <strong>How it works:</strong> Files are renamed in memory only. Use "Download" buttons to save renamed files to your computer. The ZIP download includes all files with their new names.
+                </div>
+                
                 <div id="successMessage" class="success-message"></div>
             </div>
 
@@ -356,6 +414,7 @@
         </div>
     </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script>
         // Set up PDF.js worker
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
@@ -363,6 +422,8 @@
         class PDFBatchViewer {
             constructor() {
                 this.files = [];
+                this.originalFiles = [];
+                this.renamedFiles = new Set();
                 this.currentFileIndex = 0;
                 this.currentPdf = null;
                 this.currentPage = 1;
@@ -410,6 +471,14 @@
                     this.renameCurrentFile();
                 });
 
+                document.getElementById('downloadCurrentBtn').addEventListener('click', () => {
+                    this.downloadCurrentFile();
+                });
+
+                document.getElementById('downloadAllBtn').addEventListener('click', () => {
+                    this.downloadAllFilesAsZip();
+                });
+
                 // Keyboard shortcuts
                 document.addEventListener('keydown', (e) => {
                     if (this.files.length === 0) return;
@@ -450,6 +519,8 @@
 
             loadFiles(fileList) {
                 this.files = Array.from(fileList).filter(file => file.type === 'application/pdf');
+                this.originalFiles = [...this.files];
+                this.renamedFiles.clear();
                 
                 if (this.files.length === 0) {
                     alert('Please select at least one PDF file.');
@@ -510,8 +581,9 @@
             updateUI() {
                 const file = this.files[this.currentFileIndex];
                 const filename = file.name.replace('.pdf', '');
+                const isRenamed = this.renamedFiles.has(this.currentFileIndex);
                 
-                document.getElementById('currentFilename').textContent = `Current file: ${file.name}`;
+                document.getElementById('currentFilename').innerHTML = `Current file: ${file.name}${isRenamed ? '<span class="renamed-indicator">RENAMED</span>' : ''}`;
                 document.getElementById('fileCounter').textContent = `File ${this.currentFileIndex + 1} of ${this.files.length}`;
                 document.getElementById('renameInput').value = filename;
                 
@@ -585,9 +657,59 @@
                 // Create a new File object with the new name
                 const renamedFile = new File([currentFile], newFileName, { type: currentFile.type });
                 this.files[this.currentFileIndex] = renamedFile;
+                this.renamedFiles.add(this.currentFileIndex);
                 
                 this.updateUI();
-                this.showSuccessMessage(`File renamed to: ${newFileName}`);
+                this.showSuccessMessage(`File renamed to: ${newFileName}. Use download buttons to save the renamed file.`);
+            }
+
+            downloadCurrentFile() {
+                const file = this.files[this.currentFileIndex];
+                this.downloadFile(file, file.name);
+            }
+
+            downloadFile(file, filename) {
+                const url = URL.createObjectURL(file);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }
+
+            async downloadAllFilesAsZip() {
+                try {
+                    const zip = new JSZip();
+                    
+                    // Add all files to the zip
+                    for (let i = 0; i < this.files.length; i++) {
+                        const file = this.files[i];
+                        const arrayBuffer = await file.arrayBuffer();
+                        zip.file(file.name, arrayBuffer);
+                    }
+                    
+                    // Generate the zip file
+                    const content = await zip.generateAsync({type: 'blob'});
+                    
+                    // Download the zip
+                    const url = URL.createObjectURL(content);
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = url;
+                    a.download = 'renamed_pdfs.zip';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    
+                    this.showSuccessMessage('All files downloaded as ZIP with their new names!');
+                } catch (error) {
+                    console.error('Error creating ZIP:', error);
+                    alert('Error creating ZIP file. Please try downloading files individually.');
+                }
             }
 
             showSuccessMessage(message) {
@@ -597,7 +719,7 @@
                 
                 setTimeout(() => {
                     successDiv.style.display = 'none';
-                }, 3000);
+                }, 5000);
             }
         }
 
