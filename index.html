@@ -371,6 +371,9 @@
                     <button id="zoomOutBtn" class="btn zoom-btn">🔍➖</button>
                     <button id="zoomInBtn" class="btn zoom-btn">🔍➕</button>
                     <button id="resetZoomBtn" class="btn zoom-btn">↻ Reset</button>
+                    <!-- Add rotate buttons -->
+                    <button id="rotateLeftBtn" class="btn zoom-btn">⟲ Rotate Left</button>
+                    <button id="rotateRightBtn" class="btn zoom-btn">⟳ Rotate Right</button>
                 </div>
 
                 <div class="page-controls">
@@ -428,6 +431,7 @@
                 this.currentPdf = null;
                 this.currentPage = 1;
                 this.scale = 1.5;
+                this.rotation = 0; // <-- Add this line
                 this.canvas = document.getElementById('pdfCanvas');
                 this.ctx = this.canvas.getContext('2d');
                 
@@ -562,7 +566,7 @@
 
                 try {
                     const page = await this.currentPdf.getPage(this.currentPage);
-                    const viewport = page.getViewport({ scale: this.scale });
+                    const viewport = page.getViewport({ scale: this.scale, rotation: this.rotation });
 
                     this.canvas.width = viewport.width;
                     this.canvas.height = viewport.height;
@@ -578,55 +582,15 @@
                 }
             }
 
-            updateUI() {
-                const file = this.files[this.currentFileIndex];
-                const filename = file.name.replace('.pdf', '');
-                const isRenamed = this.renamedFiles.has(this.currentFileIndex);
-                
-                document.getElementById('currentFilename').innerHTML = `Current file: ${file.name}${isRenamed ? '<span class="renamed-indicator">RENAMED</span>' : ''}`;
-                document.getElementById('fileCounter').textContent = `File ${this.currentFileIndex + 1} of ${this.files.length}`;
-                document.getElementById('renameInput').value = filename;
-                
-                // Update navigation buttons
-                document.getElementById('prevBtn').disabled = this.currentFileIndex === 0;
-                document.getElementById('nextBtn').disabled = this.currentFileIndex === this.files.length - 1;
-                
-                // Update page controls
-                if (this.currentPdf) {
-                    document.getElementById('pageInfo').textContent = `Page ${this.currentPage} of ${this.currentPdf.numPages}`;
-                    document.getElementById('prevPageBtn').disabled = this.currentPage === 1;
-                    document.getElementById('nextPageBtn').disabled = this.currentPage === this.currentPdf.numPages;
-                }
+            async rotateLeft() {
+                this.rotation = (this.rotation - 90) % 360;
+                if (this.rotation < 0) this.rotation += 360;
+                await this.renderCurrentPage();
             }
 
-            showPrevious() {
-                if (this.currentFileIndex > 0) {
-                    this.currentFileIndex--;
-                    this.loadCurrentFile();
-                }
-            }
-
-            showNext() {
-                if (this.currentFileIndex < this.files.length - 1) {
-                    this.currentFileIndex++;
-                    this.loadCurrentFile();
-                }
-            }
-
-            async showPreviousPage() {
-                if (this.currentPage > 1) {
-                    this.currentPage--;
-                    await this.renderCurrentPage();
-                    this.updateUI();
-                }
-            }
-
-            async showNextPage() {
-                if (this.currentPdf && this.currentPage < this.currentPdf.numPages) {
-                    this.currentPage++;
-                    await this.renderCurrentPage();
-                    this.updateUI();
-                }
+            async rotateRight() {
+                this.rotation = (this.rotation + 90) % 360;
+                await this.renderCurrentPage();
             }
 
             async zoomIn() {
@@ -641,17 +605,7 @@
 
             async resetZoom() {
                 this.scale = 1.5;
-                await this.renderCurrentPage();
-            }
-
-            async rotateLeft() {
-                this.rotation = (this.rotation - 90) % 360;
-                if (this.rotation < 0) this.rotation += 360;
-                await this.renderCurrentPage();
-            }
-
-            async rotateRight() {
-                this.rotation = (this.rotation + 90) % 360;
+                this.rotation = 0; // <-- Reset rotation as well
                 await this.renderCurrentPage();
             }
 
