@@ -644,6 +644,17 @@
                 await this.renderCurrentPage();
             }
 
+            async rotateLeft() {
+                this.rotation = (this.rotation - 90) % 360;
+                if (this.rotation < 0) this.rotation += 360;
+                await this.renderCurrentPage();
+            }
+
+            async rotateRight() {
+                this.rotation = (this.rotation + 90) % 360;
+                await this.renderCurrentPage();
+            }
+
             renameCurrentFile() {
                 const newName = document.getElementById('renameInput').value.trim();
                 if (!newName) {
